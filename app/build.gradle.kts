@@ -48,7 +48,7 @@ dependencies {
     implementation("androidx.preference:preference-ktx:1.2.1")
 
     // Xray core library for VLESS protocol
-    implementation("com.github.2dust:AndroidLibXrayLite:1.8.6")
+    implementation("com.github.2dust:AndroidLibXrayLite:v26.3.27")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
