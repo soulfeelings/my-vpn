@@ -47,8 +47,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.preference:preference-ktx:1.2.1")
 
-    // Xray core library for VLESS protocol
-    implementation("com.github.2dust:AndroidLibXrayLite:v26.3.27")
+    // Xray core library for VLESS protocol (local AAR — JitPack builds are broken)
+    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar"))))
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
