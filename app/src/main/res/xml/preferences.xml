@@ -1,6 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
 
+    <PreferenceCategory app:title="Import">
+
+        <EditTextPreference
+            app:key="import_link"
+            app:title="Import VLESS Link"
+            app:summary="Paste a vless:// link to auto-fill all settings"
+            app:dialogTitle="Paste VLESS Link" />
+
+    </PreferenceCategory>
+
     <PreferenceCategory app:title="Server">
 
         <EditTextPreference
@@ -81,6 +91,24 @@
             app:title="Allow Insecure"
             app:summary="Allow insecure TLS connections"
             app:defaultValue="false" />
+
+        <EditTextPreference
+            app:key="public_key"
+            app:title="Public Key (Reality)"
+            app:dialogTitle="Public Key"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:key="short_id"
+            app:title="Short ID (Reality)"
+            app:dialogTitle="Short ID"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:key="spider_x"
+            app:title="Spider X (Reality)"
+            app:dialogTitle="Spider X"
+            app:useSimpleSummaryProvider="true" />
 
     </PreferenceCategory>
 

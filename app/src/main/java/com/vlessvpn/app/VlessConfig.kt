@@ -1,6 +1,7 @@
 package com.vlessvpn.app
 
 import android.content.Context
+import android.net.Uri
 import androidx.preference.PreferenceManager
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
@@ -16,7 +17,10 @@ data class VlessConfig(
     val security: String,
     val sni: String,
     val fingerprint: String,
-    val allowInsecure: Boolean
+    val allowInsecure: Boolean,
+    val publicKey: String,
+    val shortId: String,
+    val spiderX: String
 ) {
     companion object {
         fun load(context: Context): VlessConfig {
@@ -31,8 +35,63 @@ data class VlessConfig(
                 security = prefs.getString("security", "tls") ?: "tls",
                 sni = prefs.getString("sni", "") ?: "",
                 fingerprint = prefs.getString("fingerprint", "chrome") ?: "chrome",
-                allowInsecure = prefs.getBoolean("allow_insecure", false)
+                allowInsecure = prefs.getBoolean("allow_insecure", false),
+                publicKey = prefs.getString("public_key", "") ?: "",
+                shortId = prefs.getString("short_id", "") ?: "",
+                spiderX = prefs.getString("spider_x", "") ?: ""
             )
+        }
+
+        fun parseVlessLink(link: String): Map<String, String>? {
+            if (!link.startsWith("vless://")) return null
+            try {
+                // vless://UUID@SERVER:PORT?params#name
+                val withoutScheme = link.removePrefix("vless://")
+                val uuid = withoutScheme.substringBefore("@")
+                val afterAt = withoutScheme.substringAfter("@")
+                val hostPort = afterAt.substringBefore("?").substringBefore("#")
+                val server = hostPort.substringBefore(":")
+                val port = hostPort.substringAfter(":").substringBefore("/").substringBefore("?").substringBefore("#")
+
+                val queryString = if (afterAt.contains("?")) {
+                    afterAt.substringAfter("?").substringBefore("#")
+                } else ""
+
+                val params = mutableMapOf<String, String>()
+                params["uuid"] = uuid
+                params["server_address"] = server
+                params["server_port"] = port
+
+                for (param in queryString.split("&")) {
+                    if (param.isBlank()) continue
+                    val key = param.substringBefore("=")
+                    val value = Uri.decode(param.substringAfter("="))
+                    when (key) {
+                        "type" -> params["network"] = value
+                        "encryption" -> params["encryption"] = value
+                        "security" -> params["security"] = value
+                        "pbk" -> params["public_key"] = value
+                        "fp" -> params["fingerprint"] = value
+                        "sni" -> params["sni"] = value
+                        "sid" -> params["short_id"] = value
+                        "spx" -> params["spider_x"] = value
+                        "flow" -> params["flow"] = value
+                    }
+                }
+                return params
+            } catch (e: Exception) {
+                return null
+            }
+        }
+
+        fun saveFromLink(context: Context, link: String): Boolean {
+            val params = parseVlessLink(link) ?: return false
+            val prefs = PreferenceManager.getDefaultSharedPreferences(context)
+            prefs.edit().apply {
+                params.forEach { (key, value) -> putString(key, value) }
+                apply()
+            }
+            return true
         }
     }
 
@@ -106,6 +165,15 @@ data class VlessConfig(
                         }
                         if (fingerprint.isNotBlank()) {
                             addProperty("fingerprint", fingerprint)
+                        }
+                        if (publicKey.isNotBlank()) {
+                            addProperty("publicKey", publicKey)
+                        }
+                        if (shortId.isNotBlank()) {
+                            addProperty("shortId", shortId)
+                        }
+                        if (spiderX.isNotBlank()) {
+                            addProperty("spiderX", spiderX)
                         }
                     })
                 }

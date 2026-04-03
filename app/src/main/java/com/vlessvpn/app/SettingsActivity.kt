@@ -1,9 +1,11 @@
 package com.vlessvpn.app
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
+import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.SwitchPreferenceCompat
 
@@ -32,6 +34,23 @@ class SettingsActivity : AppCompatActivity() {
     class SettingsFragment : PreferenceFragmentCompat() {
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             setPreferencesFromResource(R.xml.preferences, rootKey)
+
+            // Handle import link
+            findPreference<EditTextPreference>("import_link")?.apply {
+                setOnPreferenceChangeListener { _, newValue ->
+                    val link = newValue as? String ?: return@setOnPreferenceChangeListener false
+                    if (VlessConfig.saveFromLink(requireContext(), link)) {
+                        Toast.makeText(requireContext(), "Link imported successfully!", Toast.LENGTH_SHORT).show()
+                        // Refresh preferences to show new values
+                        preferenceScreen.removeAll()
+                        setPreferencesFromResource(R.xml.preferences, null)
+                        onCreatePreferences(null, null)
+                    } else {
+                        Toast.makeText(requireContext(), "Invalid VLESS link", Toast.LENGTH_SHORT).show()
+                    }
+                    false // Don't save the link itself
+                }
+            }
 
             // Show current values as summaries
             findPreference<EditTextPreference>("server_address")?.apply {
