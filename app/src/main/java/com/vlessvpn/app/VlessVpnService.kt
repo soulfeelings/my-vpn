@@ -11,9 +11,9 @@ import android.os.ParcelFileDescriptor
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.*
+import libv2ray.CoreCallbackHandler
+import libv2ray.CoreController
 import libv2ray.Libv2ray
-import libv2ray.V2RayPoint
-import libv2ray.V2RayVPNServiceSupportsSet
 import java.io.File
 
 class VlessVpnService : VpnService() {
@@ -32,7 +32,7 @@ class VlessVpnService : VpnService() {
     }
 
     private var vpnInterface: ParcelFileDescriptor? = null
-    private var v2rayPoint: V2RayPoint? = null
+    private var coreController: CoreController? = null
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     override fun onCreate() {
@@ -63,64 +63,51 @@ class VlessVpnService : VpnService() {
                 val configFile = File(filesDir, "config.json")
                 configFile.writeText(configJson)
 
-                // Initialize V2Ray
-                val v2ray = Libv2ray.newV2RayPoint(object : V2RayVPNServiceSupportsSet {
+                // Setup TUN interface
+                val builder = Builder()
+                    .setSession("VlessVPN")
+                    .setMtu(1500)
+                    .addAddress("10.1.0.1", 30)
+                    .addDnsServer("1.1.1.1")
+                    .addDnsServer("8.8.8.8")
+                    .addRoute("0.0.0.0", 0)
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    builder.setMetered(false)
+                }
+
+                // Exclude the app itself from VPN to prevent loops
+                try {
+                    builder.addDisallowedApplication(packageName)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not exclude app from VPN", e)
+                }
+
+                vpnInterface = builder.establish()
+                val fd = vpnInterface?.fd ?: throw Exception("Failed to establish VPN interface")
+
+                // Initialize V2Ray with new CoreController API
+                val callback = object : CoreCallbackHandler {
+                    override fun onEmitStatus(status: Long, msg: String?): Long {
+                        Log.d(TAG, "V2Ray status: $status - $msg")
+                        return 0
+                    }
+
                     override fun shutdown(): Long {
                         vpnInterface?.close()
                         vpnInterface = null
                         return 0
                     }
 
-                    override fun prepare(): Long {
-                        return 0
+                    override fun startup(): Long {
+                        return fd.toLong()
                     }
+                }
 
-                    override fun protect(fd: Long): Boolean {
-                        return this@VlessVpnService.protect(fd.toInt())
-                    }
+                val controller = Libv2ray.newCoreController(callback)
+                coreController = controller
 
-                    override fun onEmitStatus(status: Long, msg: String?): Long {
-                        Log.d(TAG, "V2Ray status: $status - $msg")
-                        return 0
-                    }
-
-                    override fun setup(fds: String?): Long {
-                        // Setup TUN interface
-                        try {
-                            val builder = Builder()
-                                .setSession("VlessVPN")
-                                .setMtu(1500)
-                                .addAddress("10.1.0.1", 30)
-                                .addDnsServer("1.1.1.1")
-                                .addDnsServer("8.8.8.8")
-                                .addRoute("0.0.0.0", 0)
-
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                builder.setMetered(false)
-                            }
-
-                            // Exclude the app itself from VPN to prevent loops
-                            try {
-                                builder.addDisallowedApplication(packageName)
-                            } catch (e: Exception) {
-                                Log.w(TAG, "Could not exclude app from VPN", e)
-                            }
-
-                            vpnInterface = builder.establish()
-                            val fd = vpnInterface?.fd ?: return -1
-                            return fd.toLong()
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Failed to setup VPN interface", e)
-                            return -1
-                        }
-                    }
-                }, false)
-
-                v2rayPoint = v2ray
-
-                v2ray.configureFileContent = configJson
-                v2ray.domainName = "${config.serverAddress}:${config.serverPort}"
-                v2ray.runLoop(true)
+                controller.startLoop(configJson, fd)
 
                 isRunning = true
                 broadcastState("CONNECTED")
@@ -142,8 +129,8 @@ class VlessVpnService : VpnService() {
     private fun stopVpn() {
         serviceScope.launch {
             try {
-                v2rayPoint?.stopLoop()
-                v2rayPoint = null
+                coreController?.stopLoop()
+                coreController = null
             } catch (e: Exception) {
                 Log.e(TAG, "Error stopping V2Ray", e)
             }
