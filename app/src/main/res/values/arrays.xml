@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="encryption_entries">
+        <item>None</item>
+    </string-array>
+    <string-array name="encryption_values">
+        <item>none</item>
+    </string-array>
+
+    <string-array name="flow_entries">
+        <item>None</item>
+        <item>xtls-rprx-vision</item>
+    </string-array>
+    <string-array name="flow_values">
+        <item></item>
+        <item>xtls-rprx-vision</item>
+    </string-array>
+
+    <string-array name="network_entries">
+        <item>TCP</item>
+        <item>WebSocket</item>
+        <item>gRPC</item>
+        <item>HTTP/2</item>
+    </string-array>
+    <string-array name="network_values">
+        <item>tcp</item>
+        <item>ws</item>
+        <item>grpc</item>
+        <item>h2</item>
+    </string-array>
+
+    <string-array name="security_entries">
+        <item>TLS</item>
+        <item>Reality</item>
+        <item>None</item>
+    </string-array>
+    <string-array name="security_values">
+        <item>tls</item>
+        <item>reality</item>
+        <item>none</item>
+    </string-array>
+
+    <string-array name="fingerprint_entries">
+        <item>Chrome</item>
+        <item>Firefox</item>
+        <item>Safari</item>
+        <item>Random</item>
+    </string-array>
+    <string-array name="fingerprint_values">
+        <item>chrome</item>
+        <item>firefox</item>
+        <item>safari</item>
+        <item>random</item>
+    </string-array>
+</resources>

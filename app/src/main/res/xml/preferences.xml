@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory app:title="Server">
+
+        <EditTextPreference
+            app:key="server_address"
+            app:title="Server Address"
+            app:dialogTitle="Server Address"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:key="server_port"
+            app:title="Server Port"
+            app:defaultValue="443"
+            app:dialogTitle="Server Port"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:key="uuid"
+            app:title="UUID"
+            app:dialogTitle="UUID"
+            app:useSimpleSummaryProvider="true" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="Protocol">
+
+        <ListPreference
+            app:key="encryption"
+            app:title="Encryption"
+            app:defaultValue="none"
+            app:entries="@array/encryption_entries"
+            app:entryValues="@array/encryption_values"
+            app:useSimpleSummaryProvider="true" />
+
+        <ListPreference
+            app:key="flow"
+            app:title="Flow"
+            app:defaultValue=""
+            app:entries="@array/flow_entries"
+            app:entryValues="@array/flow_values"
+            app:useSimpleSummaryProvider="true" />
+
+        <ListPreference
+            app:key="network"
+            app:title="Network"
+            app:defaultValue="tcp"
+            app:entries="@array/network_entries"
+            app:entryValues="@array/network_values"
+            app:useSimpleSummaryProvider="true" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="Security">
+
+        <ListPreference
+            app:key="security"
+            app:title="Security"
+            app:defaultValue="tls"
+            app:entries="@array/security_entries"
+            app:entryValues="@array/security_values"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:key="sni"
+            app:title="SNI (Server Name)"
+            app:dialogTitle="SNI"
+            app:useSimpleSummaryProvider="true" />
+
+        <ListPreference
+            app:key="fingerprint"
+            app:title="uTLS Fingerprint"
+            app:defaultValue="chrome"
+            app:entries="@array/fingerprint_entries"
+            app:entryValues="@array/fingerprint_values"
+            app:useSimpleSummaryProvider="true" />
+
+        <SwitchPreferenceCompat
+            app:key="allow_insecure"
+            app:title="Allow Insecure"
+            app:summary="Allow insecure TLS connections"
+            app:defaultValue="false" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

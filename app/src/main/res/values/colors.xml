@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="background_dark">#FF1A1A2E</color>
+    <color name="connect_blue">#FF4A90D9</color>
+    <color name="disconnect_red">#FFD94A4A</color>
+    <color name="connected_green">#FF4AD97A</color>
+    <color name="disconnected_gray">#FF8888AA</color>
+    <color name="text_primary">#FFFFFFFF</color>
+    <color name="text_secondary">#FFAAAACC</color>
+    <color name="surface_dark">#FF16213E</color>
+</resources>
