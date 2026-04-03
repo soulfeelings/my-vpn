@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
+import android.net.TrafficStats
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
@@ -34,6 +35,9 @@ class VlessVpnService : VpnService() {
     private var vpnInterface: ParcelFileDescriptor? = null
     private var coreController: CoreController? = null
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var trafficJob: Job? = null
+    private var startRxBytes = 0L
+    private var startTxBytes = 0L
 
     override fun onCreate() {
         super.onCreate()
@@ -112,10 +116,17 @@ class VlessVpnService : VpnService() {
                 isRunning = true
                 broadcastState("CONNECTED")
 
+                // Record baseline traffic
+                startRxBytes = TrafficStats.getTotalRxBytes()
+                startTxBytes = TrafficStats.getTotalTxBytes()
+
                 withContext(Dispatchers.Main) {
                     val nm = getSystemService(NotificationManager::class.java)
-                    nm.notify(NOTIFICATION_ID, createNotification("Connected"))
+                    nm.notify(NOTIFICATION_ID, createNotification("Connected", "0 B", "0 B"))
                 }
+
+                // Start traffic stats update loop
+                startTrafficMonitor()
 
                 Log.i(TAG, "VPN connected successfully")
             } catch (e: Exception) {
@@ -127,6 +138,8 @@ class VlessVpnService : VpnService() {
     }
 
     private fun stopVpn() {
+        trafficJob?.cancel()
+        trafficJob = null
         serviceScope.launch {
             try {
                 coreController?.stopLoop()
@@ -143,6 +156,43 @@ class VlessVpnService : VpnService() {
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
+    }
+
+    private fun startTrafficMonitor() {
+        trafficJob = serviceScope.launch {
+            while (isActive && isRunning) {
+                delay(2000)
+                val rxBytes = TrafficStats.getTotalRxBytes() - startRxBytes
+                val txBytes = TrafficStats.getTotalTxBytes() - startTxBytes
+                val downStr = formatBytes(rxBytes)
+                val upStr = formatBytes(txBytes)
+
+                withContext(Dispatchers.Main) {
+                    val nm = getSystemService(NotificationManager::class.java)
+                    nm.notify(NOTIFICATION_ID, createNotification("Connected", downStr, upStr))
+                }
+
+                broadcastTraffic(downStr, upStr)
+            }
+        }
+    }
+
+    private fun formatBytes(bytes: Long): String {
+        return when {
+            bytes < 1024 -> "$bytes B"
+            bytes < 1024 * 1024 -> "%.1f KB".format(bytes / 1024.0)
+            bytes < 1024 * 1024 * 1024 -> "%.1f MB".format(bytes / (1024.0 * 1024))
+            else -> "%.2f GB".format(bytes / (1024.0 * 1024 * 1024))
+        }
+    }
+
+    private fun broadcastTraffic(down: String, up: String) {
+        val intent = Intent(BROADCAST_ACTION).apply {
+            putExtra("state", "TRAFFIC")
+            putExtra("down", down)
+            putExtra("up", up)
+        }
+        sendBroadcast(intent)
     }
 
     private fun broadcastState(state: String, message: String? = null) {
@@ -167,20 +217,28 @@ class VlessVpnService : VpnService() {
         }
     }
 
-    private fun createNotification(status: String): Notification {
+    private fun createNotification(status: String, down: String? = null, up: String? = null): Notification {
         val pendingIntent = PendingIntent.getActivity(
             this, 0,
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("VLESS VPN")
-            .setContentText(status)
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("VLESS VPN - $status")
             .setSmallIcon(R.drawable.ic_vpn_on)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
-            .build()
+
+        if (down != null && up != null) {
+            builder.setContentText("\u2193 $down  \u2191 $up")
+            builder.setStyle(NotificationCompat.BigTextStyle()
+                .bigText("\u2193 Download: $down\n\u2191 Upload: $up"))
+        } else {
+            builder.setContentText(status)
+        }
+
+        return builder.build()
     }
 
     override fun onDestroy() {

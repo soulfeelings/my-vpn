@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.res.ColorStateList
 import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
@@ -34,6 +35,11 @@ class MainActivity : AppCompatActivity() {
             when (intent?.getStringExtra("state")) {
                 "CONNECTED" -> updateUI(connected = true)
                 "DISCONNECTED" -> updateUI(connected = false)
+                "TRAFFIC" -> {
+                    val down = intent?.getStringExtra("down") ?: "0 B"
+                    val up = intent?.getStringExtra("up") ?: "0 B"
+                    binding.tvStatus.text = "\u2193 $down  \u2191 $up"
+                }
                 "ERROR" -> {
                     val msg = intent.getStringExtra("message") ?: "Unknown error"
                     Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show()
@@ -113,13 +119,13 @@ class MainActivity : AppCompatActivity() {
         isConnected = connected
         if (connected) {
             binding.btnConnect.text = getString(R.string.disconnect)
-            binding.btnConnect.setBackgroundColor(getColor(R.color.disconnect_red))
+            binding.btnConnect.backgroundTintList = ColorStateList.valueOf(getColor(R.color.disconnect_red))
             binding.tvStatus.text = getString(R.string.status_connected)
             binding.tvStatus.setTextColor(getColor(R.color.connected_green))
             binding.ivStatusIcon.setImageResource(R.drawable.ic_vpn_on)
         } else {
             binding.btnConnect.text = getString(R.string.connect)
-            binding.btnConnect.setBackgroundColor(getColor(R.color.connect_blue))
+            binding.btnConnect.backgroundTintList = ColorStateList.valueOf(getColor(R.color.connect_blue))
             binding.tvStatus.text = getString(R.string.status_disconnected)
             binding.tvStatus.setTextColor(getColor(R.color.disconnected_gray))
             binding.ivStatusIcon.setImageResource(R.drawable.ic_vpn_off)
