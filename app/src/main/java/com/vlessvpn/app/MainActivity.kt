@@ -13,6 +13,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.preference.PreferenceManager
 import com.vlessvpn.app.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
@@ -27,6 +28,7 @@ class MainActivity : AppCompatActivity() {
             startVpn()
         } else {
             Toast.makeText(this, "VPN permission denied", Toast.LENGTH_SHORT).show()
+            updateUI(connected = false)
         }
     }
 
@@ -42,7 +44,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 "ERROR" -> {
                     val msg = intent.getStringExtra("message") ?: "Unknown error"
-                    Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, msg, Toast.LENGTH_LONG).show()
                     updateUI(connected = false)
                 }
             }
@@ -54,16 +56,32 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // Load saved link
+        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        val savedLink = prefs.getString("vless_link", "") ?: ""
+        if (savedLink.isNotBlank()) {
+            binding.etVlessLink.setText(savedLink)
+        }
+
         binding.btnConnect.setOnClickListener {
             if (isConnected) {
                 stopVpn()
             } else {
+                val link = binding.etVlessLink.text.toString().trim()
+                if (link.isBlank() || !link.startsWith("vless://")) {
+                    Toast.makeText(this, "Please paste a valid vless:// link", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+
+                // Save and parse the link
+                prefs.edit().putString("vless_link", link).apply()
+                if (!VlessConfig.saveFromLink(this, link)) {
+                    Toast.makeText(this, "Invalid VLESS link format", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+
                 requestVpnPermissionAndStart()
             }
-        }
-
-        binding.btnSettings.setOnClickListener {
-            startActivity(Intent(this, SettingsActivity::class.java))
         }
 
         updateUI(connected = false)
@@ -87,12 +105,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun requestVpnPermissionAndStart() {
-        val config = VlessConfig.load(this)
-        if (config.serverAddress.isBlank() || config.uuid.isBlank()) {
-            Toast.makeText(this, "Please configure server address and UUID in Settings first", Toast.LENGTH_LONG).show()
-            return
-        }
-
         val prepareIntent = VpnService.prepare(this)
         if (prepareIntent != null) {
             vpnPermissionLauncher.launch(prepareIntent)
@@ -106,6 +118,7 @@ class MainActivity : AppCompatActivity() {
         binding.btnConnect.text = "Connecting..."
         binding.btnConnect.isEnabled = false
         binding.tvStatus.text = "Connecting..."
+        binding.etVlessLink.isEnabled = false
 
         val intent = Intent(this, VlessVpnService::class.java).apply {
             action = VlessVpnService.ACTION_START
@@ -129,12 +142,14 @@ class MainActivity : AppCompatActivity() {
             binding.tvStatus.text = getString(R.string.status_connected)
             binding.tvStatus.setTextColor(getColor(R.color.connected_green))
             binding.ivStatusIcon.setImageResource(R.drawable.ic_vpn_on)
+            binding.etVlessLink.isEnabled = false
         } else {
             binding.btnConnect.text = getString(R.string.connect)
             binding.btnConnect.backgroundTintList = ColorStateList.valueOf(getColor(R.color.connect_blue))
             binding.tvStatus.text = getString(R.string.status_disconnected)
             binding.tvStatus.setTextColor(getColor(R.color.disconnected_gray))
             binding.ivStatusIcon.setImageResource(R.drawable.ic_vpn_off)
+            binding.etVlessLink.isEnabled = true
         }
     }
 }

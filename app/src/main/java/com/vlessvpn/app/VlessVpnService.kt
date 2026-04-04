@@ -12,6 +12,7 @@ import android.os.ParcelFileDescriptor
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.*
+import go.Seq
 import libv2ray.CoreCallbackHandler
 import libv2ray.CoreController
 import libv2ray.Libv2ray
@@ -42,6 +43,8 @@ class VlessVpnService : VpnService() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        // Initialize gomobile runtime
+        Seq.setContext(applicationContext)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -90,7 +93,13 @@ class VlessVpnService : VpnService() {
                 vpnInterface = builder.establish()
                 val fd = vpnInterface?.fd ?: throw Exception("Failed to establish VPN interface")
 
-                // Initialize V2Ray with new CoreController API
+                // Protect the VPN fd
+                protect(fd)
+
+                // Initialize V2Ray core environment (assetPath, xudpBaseKey)
+                Libv2ray.initCoreEnv(filesDir.absolutePath, "")
+
+                // Initialize V2Ray with CoreController API
                 val callback = object : CoreCallbackHandler {
                     override fun onEmitStatus(status: Long, msg: String?): Long {
                         Log.d(TAG, "V2Ray status: $status - $msg")
@@ -98,20 +107,27 @@ class VlessVpnService : VpnService() {
                     }
 
                     override fun shutdown(): Long {
+                        Log.d(TAG, "V2Ray shutdown callback")
                         vpnInterface?.close()
                         vpnInterface = null
                         return 0
                     }
 
                     override fun startup(): Long {
-                        return fd.toLong()
+                        Log.d(TAG, "V2Ray startup callback")
+                        return 0
                     }
                 }
 
                 val controller = Libv2ray.newCoreController(callback)
                 coreController = controller
 
+                Log.d(TAG, "Starting V2Ray loop with fd=$fd")
                 controller.startLoop(configJson, fd)
+
+                if (!controller.isRunning) {
+                    throw Exception("V2Ray core failed to start")
+                }
 
                 isRunning = true
                 broadcastState("CONNECTED")
