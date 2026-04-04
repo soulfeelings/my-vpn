@@ -131,7 +131,15 @@ class VlessVpnService : VpnService() {
                 Log.i(TAG, "VPN connected successfully")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to start VPN", e)
-                broadcastState("ERROR", e.message ?: "Failed to start VPN")
+                val errorMsg = e.message ?: "Failed to start VPN"
+                broadcastState("ERROR", errorMsg)
+                withContext(Dispatchers.Main) {
+                    val nm = getSystemService(NotificationManager::class.java)
+                    nm.notify(NOTIFICATION_ID, createNotification("Error: $errorMsg"))
+                }
+                // Keep notification visible for 3 seconds so user can see the error
+                delay(3000)
+                stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
         }
@@ -188,6 +196,7 @@ class VlessVpnService : VpnService() {
 
     private fun broadcastTraffic(down: String, up: String) {
         val intent = Intent(BROADCAST_ACTION).apply {
+            setPackage(packageName)
             putExtra("state", "TRAFFIC")
             putExtra("down", down)
             putExtra("up", up)
@@ -196,7 +205,9 @@ class VlessVpnService : VpnService() {
     }
 
     private fun broadcastState(state: String, message: String? = null) {
+        Log.d(TAG, "Broadcasting state: $state ${message ?: ""}")
         val intent = Intent(BROADCAST_ACTION).apply {
+            setPackage(packageName)
             putExtra("state", state)
             message?.let { putExtra("message", it) }
         }

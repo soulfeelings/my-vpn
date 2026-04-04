@@ -102,6 +102,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startVpn() {
+        // Show connecting state immediately
+        binding.btnConnect.text = "Connecting..."
+        binding.btnConnect.isEnabled = false
+        binding.tvStatus.text = "Connecting..."
+
         val intent = Intent(this, VlessVpnService::class.java).apply {
             action = VlessVpnService.ACTION_START
         }
@@ -117,6 +122,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateUI(connected: Boolean) {
         isConnected = connected
+        binding.btnConnect.isEnabled = true
         if (connected) {
             binding.btnConnect.text = getString(R.string.disconnect)
             binding.btnConnect.backgroundTintList = ColorStateList.valueOf(getColor(R.color.disconnect_red))
