@@ -101,7 +101,21 @@ data class VlessConfig(
     fun toXrayJson(): String {
         val root = JsonObject()
 
-        // Inbounds - local SOCKS5 proxy
+        // Log
+        root.add("log", JsonObject().apply {
+            addProperty("loglevel", "warning")
+        })
+
+        // DNS
+        root.add("dns", JsonObject().apply {
+            add("servers", JsonArray().apply {
+                add("1.1.1.1")
+                add("8.8.8.8")
+            })
+            addProperty("queryStrategy", "UseIP")
+        })
+
+        // Inbounds - SOCKS5 proxy
         val inbounds = JsonArray()
         val socksInbound = JsonObject().apply {
             addProperty("tag", "socks")
@@ -117,7 +131,9 @@ data class VlessConfig(
                 add("destOverride", JsonArray().apply {
                     add("http")
                     add("tls")
+                    add("quic")
                 })
+                addProperty("routeOnly", true)
             })
         }
         inbounds.add(socksInbound)
@@ -197,15 +213,27 @@ data class VlessConfig(
 
         // Routing
         root.add("routing", JsonObject().apply {
-            addProperty("domainStrategy", "IPIfNonMatch")
+            addProperty("domainStrategy", "AsIs")
             add("rules", JsonArray().apply {
-                // Block private IPs from going through proxy
+                // DNS queries go direct
+                add(JsonObject().apply {
+                    addProperty("type", "field")
+                    addProperty("outboundTag", "direct")
+                    add("port", JsonArray().apply { add("53") })
+                })
+                // Direct for private IPs
                 add(JsonObject().apply {
                     addProperty("type", "field")
                     addProperty("outboundTag", "direct")
                     add("ip", JsonArray().apply {
                         add("geoip:private")
                     })
+                })
+                // Everything else through proxy
+                add(JsonObject().apply {
+                    addProperty("type", "field")
+                    addProperty("outboundTag", "proxy")
+                    addProperty("port", "0-65535")
                 })
             })
         })

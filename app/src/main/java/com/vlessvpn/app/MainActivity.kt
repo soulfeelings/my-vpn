@@ -15,11 +15,16 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.preference.PreferenceManager
 import com.vlessvpn.app.databinding.ActivityMainBinding
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private var isConnected = false
+    private val logBuilder = StringBuilder()
+    private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
 
     private val vpnPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -28,6 +33,7 @@ class MainActivity : AppCompatActivity() {
             startVpn()
         } else {
             Toast.makeText(this, "VPN permission denied", Toast.LENGTH_SHORT).show()
+            appendLog("VPN permission denied")
             updateUI(connected = false)
         }
     }
@@ -35,15 +41,26 @@ class MainActivity : AppCompatActivity() {
     private val vpnStateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.getStringExtra("state")) {
-                "CONNECTED" -> updateUI(connected = true)
-                "DISCONNECTED" -> updateUI(connected = false)
+                "CONNECTED" -> {
+                    appendLog("Connected!")
+                    updateUI(connected = true)
+                }
+                "DISCONNECTED" -> {
+                    appendLog("Disconnected")
+                    updateUI(connected = false)
+                }
                 "TRAFFIC" -> {
                     val down = intent?.getStringExtra("down") ?: "0 B"
                     val up = intent?.getStringExtra("up") ?: "0 B"
                     binding.tvStatus.text = "\u2193 $down  \u2191 $up"
                 }
+                "LOG" -> {
+                    val log = intent?.getStringExtra("log") ?: return
+                    appendLog(log)
+                }
                 "ERROR" -> {
                     val msg = intent.getStringExtra("message") ?: "Unknown error"
+                    appendLog("ERROR: $msg")
                     Toast.makeText(this@MainActivity, msg, Toast.LENGTH_LONG).show()
                     updateUI(connected = false)
                 }
@@ -77,8 +94,14 @@ class MainActivity : AppCompatActivity() {
                 prefs.edit().putString("vless_link", link).apply()
                 if (!VlessConfig.saveFromLink(this, link)) {
                     Toast.makeText(this, "Invalid VLESS link format", Toast.LENGTH_SHORT).show()
+                    appendLog("Failed to parse VLESS link")
                     return@setOnClickListener
                 }
+
+                // Clear logs on new connection
+                logBuilder.clear()
+                binding.tvLogs.text = ""
+                appendLog("Parsed link OK")
 
                 requestVpnPermissionAndStart()
             }
@@ -107,6 +130,7 @@ class MainActivity : AppCompatActivity() {
     private fun requestVpnPermissionAndStart() {
         val prepareIntent = VpnService.prepare(this)
         if (prepareIntent != null) {
+            appendLog("Requesting VPN permission...")
             vpnPermissionLauncher.launch(prepareIntent)
         } else {
             startVpn()
@@ -114,11 +138,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startVpn() {
-        // Show connecting state immediately
         binding.btnConnect.text = "Connecting..."
         binding.btnConnect.isEnabled = false
         binding.tvStatus.text = "Connecting..."
         binding.etVlessLink.isEnabled = false
+        appendLog("Starting VPN service...")
 
         val intent = Intent(this, VlessVpnService::class.java).apply {
             action = VlessVpnService.ACTION_START
@@ -127,10 +151,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun stopVpn() {
+        appendLog("Stopping VPN...")
         val intent = Intent(this, VlessVpnService::class.java).apply {
             action = VlessVpnService.ACTION_STOP
         }
         startService(intent)
+    }
+
+    private fun appendLog(msg: String) {
+        val time = timeFormat.format(Date())
+        logBuilder.append("[$time] $msg\n")
+        binding.tvLogs.text = logBuilder.toString()
+        // Auto-scroll to bottom
+        binding.svLogs.post { binding.svLogs.fullScroll(android.view.View.FOCUS_DOWN) }
     }
 
     private fun updateUI(connected: Boolean) {

@@ -63,8 +63,11 @@ class VlessVpnService : VpnService() {
     private fun startVpn() {
         serviceScope.launch {
             try {
+                broadcastLog("Loading config...")
                 val config = VlessConfig.load(this@VlessVpnService)
                 val configJson = config.toXrayJson()
+                broadcastLog("Server: ${config.serverAddress}:${config.serverPort}")
+                broadcastLog("Security: ${config.security}, Network: ${config.network}")
 
                 // Write config to file
                 val configFile = File(filesDir, "config.json")
@@ -92,17 +95,20 @@ class VlessVpnService : VpnService() {
 
                 vpnInterface = builder.establish()
                 val fd = vpnInterface?.fd ?: throw Exception("Failed to establish VPN interface")
+                broadcastLog("TUN interface established, fd=$fd")
 
                 // Protect the VPN fd
                 protect(fd)
 
                 // Initialize V2Ray core environment (assetPath, xudpBaseKey)
+                broadcastLog("Initializing V2Ray core...")
                 Libv2ray.initCoreEnv(filesDir.absolutePath, "")
 
                 // Initialize V2Ray with CoreController API
                 val callback = object : CoreCallbackHandler {
                     override fun onEmitStatus(status: Long, msg: String?): Long {
                         Log.d(TAG, "V2Ray status: $status - $msg")
+                        broadcastLog("core: $msg")
                         return 0
                     }
 
@@ -122,13 +128,14 @@ class VlessVpnService : VpnService() {
                 val controller = Libv2ray.newCoreController(callback)
                 coreController = controller
 
-                Log.d(TAG, "Starting V2Ray loop with fd=$fd")
+                broadcastLog("Starting V2Ray loop with fd=$fd...")
                 controller.startLoop(configJson, fd)
 
                 if (!controller.isRunning) {
                     throw Exception("V2Ray core failed to start")
                 }
 
+                broadcastLog("V2Ray core started successfully")
                 isRunning = true
                 broadcastState("CONNECTED")
 
@@ -148,6 +155,7 @@ class VlessVpnService : VpnService() {
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to start VPN", e)
                 val errorMsg = e.message ?: "Failed to start VPN"
+                broadcastLog("ERROR: $errorMsg")
                 broadcastState("ERROR", errorMsg)
                 withContext(Dispatchers.Main) {
                     val nm = getSystemService(NotificationManager::class.java)
@@ -216,6 +224,15 @@ class VlessVpnService : VpnService() {
             putExtra("state", "TRAFFIC")
             putExtra("down", down)
             putExtra("up", up)
+        }
+        sendBroadcast(intent)
+    }
+
+    private fun broadcastLog(msg: String) {
+        val intent = Intent(BROADCAST_ACTION).apply {
+            setPackage(packageName)
+            putExtra("state", "LOG")
+            putExtra("log", msg)
         }
         sendBroadcast(intent)
     }
