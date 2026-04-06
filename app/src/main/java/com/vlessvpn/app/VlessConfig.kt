@@ -219,7 +219,7 @@ data class VlessConfig(
                 add(JsonObject().apply {
                     addProperty("type", "field")
                     addProperty("outboundTag", "direct")
-                    add("port", JsonArray().apply { add("53") })
+                    addProperty("port", "53")
                 })
                 // Direct for private IPs
                 add(JsonObject().apply {
