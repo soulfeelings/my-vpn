@@ -12,6 +12,7 @@ import android.os.ParcelFileDescriptor
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.*
+import com.v2ray.ang.service.TProxyService
 import go.Seq
 import libv2ray.CoreCallbackHandler
 import libv2ray.CoreController
@@ -128,14 +129,42 @@ class VlessVpnService : VpnService() {
                 val controller = Libv2ray.newCoreController(callback)
                 coreController = controller
 
-                broadcastLog("Starting V2Ray loop with fd=$fd...")
-                controller.startLoop(configJson, fd)
+                broadcastLog("Starting V2Ray loop...")
+                // Pass 0 as fd: tun2socks handles the TUN, xray just provides SOCKS5
+                controller.startLoop(configJson, 0)
 
                 if (!controller.isRunning) {
                     throw Exception("V2Ray core failed to start")
                 }
 
                 broadcastLog("V2Ray core started successfully")
+
+                // Write tun2socks YAML config and start it
+                broadcastLog("Starting tun2socks...")
+                val tproxyConfig = """
+                    |tunnel:
+                    |  mtu: 1500
+                    |  ipv4: 10.1.0.1
+                    |socks5:
+                    |  port: 10808
+                    |  address: 127.0.0.1
+                    |  udp: 'udp'
+                    |misc:
+                    |  tcp-read-write-timeout: 300000
+                    |  udp-read-write-timeout: 60000
+                    |  log-level: warn
+                """.trimMargin()
+                val tproxyFile = File(filesDir, "hev-socks5-tunnel.yaml")
+                tproxyFile.writeText(tproxyConfig)
+
+                try {
+                    TProxyService.TProxyStartService(tproxyFile.absolutePath, fd)
+                    broadcastLog("tun2socks started")
+                } catch (e: Throwable) {
+                    broadcastLog("tun2socks error: ${e.message}")
+                    throw e
+                }
+
                 isRunning = true
                 broadcastState("CONNECTED")
 
@@ -173,6 +202,11 @@ class VlessVpnService : VpnService() {
         trafficJob?.cancel()
         trafficJob = null
         serviceScope.launch {
+            try {
+                TProxyService.TProxyStopService()
+            } catch (e: Throwable) {
+                Log.e(TAG, "Error stopping tun2socks", e)
+            }
             try {
                 coreController?.stopLoop()
                 coreController = null
